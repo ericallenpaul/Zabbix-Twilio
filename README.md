@@ -7,18 +7,18 @@ Drop the script and the config file into [ZabbixAlertScriptsPath](https://www.za
 The script relys on the following perl modules:
 
 ```perl
-XML::Simple;
-WWW::Twilio::API;
-File::Log;
-DateTime;
-Data::Dumper;
+XML::Simple
+WWW::Twilio::API
+File::Log
+DateTime
+Data::Dumper
 Date::Calc
 ```
 You may need to download and install them with ppm.
 You will also need to make sure this script has write access to its local directory.
 
 # Configuration
-The configuration file is a property separated by an equal sign. Hash tags can be used to place comments in this file. The configuration file supports the following options:
+The configuration file consists of properties and values separated by an equal sign. Hash tags can be used to place comments in this file. The configuration file supports the following options:
 
 ##### Account information
 There are 2 settings here, accountSid and authToken. Both of these are supplied by Twilio and are essentially your login credentials.
@@ -40,7 +40,7 @@ UseWeeklySchedule = 0
 ```
 
 ##### OnCallNumbers and OnCallNames
-Oncall numbers is a command delimited list of phone numbers that will be rotated through weekely. The names list should match the numbers. If you only have a single number that needs to receive alerts then use the singular version of these settings and set UseWeeklySchedule to zero.
+On call numbers is a command delimited list of phone numbers that will be rotated through weekely. The names list should match the numbers. If you only have a single number that needs to receive alerts then use the singular version of these settings and set UseWeeklySchedule to zero.
 ```
 # Multiple people designated to receive messages
 # on a weekly rotating call schedule
