@@ -1,0 +1,255 @@
+#!/usr/bin/env perl
+use XML::Simple;
+use lib 'lib';
+use WWW::Twilio::API;
+use File::Log;
+use DateTime;
+use Data::Dumper;
+
+use Date::Calc qw(
+    Week_of_Year
+    Day_of_Week
+    Day_of_Year
+    Day_of_Week_to_Text
+    Monday_of_Week
+    Add_Delta_Days
+);
+
+# Set the timezone
+my $date = DateTime->now->set_time_zone('America/New_York');
+
+# Get the individual DateValues
+my $month = $date->month();
+my $day = $date->day();
+my $year = $date->year();
+my $min = $date->minute;
+my $hour = $date->hour;
+my $sec = $date->second;
+
+# Get the week number, day name and tomorrow's week number
+my $weekNumber = Week_of_Year($year,$month,$day);
+my $dayOfWeek = Day_of_Week($year,$month,$day);
+my $dayName = Day_of_Week_to_Text($dayOfWeek);
+($yearTomorrow,$monthTomorrow,$dayTomorrow) = Add_Delta_Days($year,$month,$day, 1);
+my $tomorrowWeekNumber = Week_of_Year($yearTomorrow,$monthTomorrow,$dayTomorrow);
+
+my $path_and_filename = 'Zabbix-Twilio.conf';
+my $message = shift @ARGV;
+my $currentPeriodFile = 'current_period';
+my $currentPeriod = -1;
+
+my $CurrentAlertNumber = "";
+
+
+my $ShouldRewriteSchedule = 0;
+my $ShouldNotify = 0;
+my $NotificationNumber = "";
+my $NotificationMessage = "You will be on call tomorrow ($monthTomorrow/$dayTomorrow/$yearTomorrow) at 12:01 AM. Please plan to respond to any alerts for the next 7 days.";
+my $ShouldUseWeeklySchedule = 0;
+
+# read the config file
+my %configParamHash = ReadConfig();
+
+# Check for an update schedule operation
+if ($message eq "UpdateSchedule") {
+	$ShouldRewriteSchedule = 1;
+}
+
+# Check for a Notify operation and see if it's the day before the week ends
+if (((lc $message) eq "notify") && ($tomorrowWeekNumber > $weekNumber)) {
+	$ShouldNotify = 1;
+    $NotificationNumber = GetPhoneNumber($tomorrowWeekNumber);
+    SendMessage($configParamHash{accountSid}, $configParamHash{authToken}, $NotificationNumber, $NotificationMessage);
+    exit;
+}
+
+#assign the weekly schedule parameter
+$ShouldUseWeeklySchedule = $configParamHash{UseWeeklySchedule};
+
+#Create the schedule files
+CreateSchedule($configParamHash{OnCallNumbers}, $configParamHash{OnCallNumber}, $ShouldRewriteSchedule, $ShouldUseWeeklySchedule);
+
+#get the current phone number for alerts
+$CurrentAlertNumber = GetPhoneNumber($weekNumber);
+
+SendMessage($configParamHash{accountSid}, $configParamHash{authToken}, $CurrentAlertNumber, $message);
+
+RotateLogs();
+
+sub SendMessage{
+    ($accountSid, $authToken, $CurrentAlertNumber, $message) = @_;
+    
+    # send the twilio credentials
+    my $twilio = new WWW::Twilio::API( AccountSid => $accountSid,
+                                       AuthToken  => $authToken);
+    
+    # Send the message
+    my $response = $twilio->POST('SMS/Messages',
+                                     From => '+15024373965',
+                                     To   => "+1$CurrentAlertNumber",
+                                     Body => $message);
+    $xml = new XML::Simple;
+    $data = $xml->XMLin($response->{content});
+    
+    # create and register a log file
+    my $log = GetLogFile();
+    
+    my $logmessage = "";
+    
+    if ( exists $data->{SMSMessage}) 
+    {
+         $logmessage = "Success: Status:$data->{SMSMessage}{Status}, DateCreated:$data->{SMSMessage}{DateCreated}, Sid:$data->{SMSMessage}{Sid}";
+         $log->say(4, $logmessage);
+    } 
+    
+    if ( exists $data->{RestException}) 
+    {
+         $logmessage = "Failed: Status:$data->{RestException}{Status}, Message:$data->{RestException}{Message}, Code:$data->{RestException}{Code}, MoreInfo:$data->{RestException}{MoreInfo}";
+         $log->say(4, $logmessage);
+    }
+}
+sub RotateLogs {
+    my $logfile = "Zabbix-Twilio.log";        # Name of the Log file
+    my $maxsize = 2_000_000;        # Max size before rotating
+    my $maxlogs = 10;            # Number of rotates before archive
+    my $archivetotal = 5;            # Number of logs to archive
+    my ($s, $m, $h, $dayOfMonth, $month, $yearOffset, $dow, $doy, $dst) = localtime(); # Create date from local time
+    my $year = 1900 + $yearOffset;
+    my $date = $year * 1000 + ($month + 1) * 100 + $dayOfMonth;    # Format Date
+    my $tarme;    # Store names of files to be archived
+
+
+    ### Check Size of log
+    if(-s $logfile > $maxsize)
+    {
+        ### Rotate old logs
+        for(my $i = $maxlogs - 1;$i > 0;$i--)
+        {
+            if(-e "${logfile}.$i")
+            {
+                my $j = $i + 1;
+                rename "${logfile}.$i", "${logfile}.$j";
+            }
+        }
+        rename "$logfile", "${logfile}.1";
+        `echo "" >> $logfile`;
+        
+        ### Archive logs
+        if(-e "${logfile}.$maxlogs")
+        {
+            for(my $i = $maxlogs - ($archivetotal - 1), my $j = 1;$i <= $maxlogs; $i++, $j++)
+            {
+                rename "${logfile}.$i", "${logfile}.${date}.$j";
+                $tarme .= "${logfile}.${date}.$j ";
+            }
+            
+            my $i = 1;
+            my $tarfile = "${logfile}.${date}.tar";
+            while ( (-e $tarfile) || (-e "${tarfile}.gz") )
+            {
+                $tarfile = "${logfile}.${date}.tar.$i";
+                $i++;
+            }
+            
+            `tar -czf $tarfile $tarme`;
+            `rm $tarme`;
+            `gzip $tarfile`;
+        }
+    }
+}
+sub CreateSchedule {
+    ($OnCallNumbers, $OnCallNumber, $ShouldRewriteSchedule, $ShouldUseWeeklySchedule) = @_;
+    my $directory = "Schedule";
+    if(! -e $directory)
+    {
+        unless(mkdir $directory) {
+            die "Unable to create $directory\n";
+        }
+    }
+    
+    if(! -e "$directory/1" || $ShouldRewriteSchedule)
+    {
+        print "Creating schedule files...\n";
+        
+        # get the list of numbers for notifications
+        my @NumberArray = split(',', $OnCallNumbers);
+        my $Indexer = 0;
+        my $ArrSize = $#NumberArray;
+
+        for( $i = 1; $i <= 52; $i = $i + 1 ){
+            open(FH,'>',"$directory/$i") or die "$!";
+            if($ShouldUseWeeklySchedule)
+            {
+                print "Assigning week $i to @NumberArray[$Indexer]\n";
+                print FH "@NumberArray[$Indexer]";
+            } else {
+                print "Assigning week $i to $OnCallNumber\n";
+                print FH "$OnCallNumber";
+            }
+            close(FH);
+            
+            #check to see if we need to go back to the first number in the list
+            if($Indexer < $ArrSize)
+            {
+                #add one to get to the next number
+                $Indexer += 1;
+            }
+            else
+            {
+                # We reached the last number in the list
+                # Starting back with the first number
+                $Indexer = 1;
+            }
+        }
+        print "Done.\n";
+        exit;
+    }
+}
+
+
+sub GetPhoneNumber {
+
+    my ($filename) = @_;
+    
+    open(my $fh, '<:encoding(UTF-8)', "Schedule/$filename") or die "Could not open file '$filename' $!";
+ 
+    while (my $row = <$fh>) {
+      return "$row";
+    }
+}
+
+sub GetLogFile{
+
+    my $log = File::Log->new({
+       debug           => $configParamHash{LogFileLevel},                   # Set the debug level
+       logFileName     => 'Zabbix-Twilio.log', # define the log filename
+       logFileMode     => '>>',                # '>>' Append or '>' overwrite
+       dateTimeStamp   => 1,                   # Timestamp log data entries
+       stderrRedirect  => 1,                   # Redirect STDERR to the log file
+       defaultFile     => 1,                   # Use the log file as the default filehandle
+       logFileDateTime => 0,                   # Timestamp the log filename
+       appName         => 'Zabbix-Twilio',     # The name of the application
+       PIDstamp        => 1,                   # Stamp the log data with the Process ID
+       storeExpText    => 1,                   # Store internally all exp text
+       msgprepend      => '',                  # Text to prepend to each message
+       say             => 1,                   # msg() and exp() methode act like the perl6 say         
+    });
+    return $log;
+}
+
+sub ReadConfig{
+    my %configParamHash = ();
+    open ( _FH, $path_and_filename ) or die "Unable to open config file: $! Please make sure you have a valid config file.";
+     
+    while ( <_FH> ) {
+        chomp;
+        s/#.*//;                # ignore comments
+        s/^\s+//;               # trim leading spaces if any
+        s/\s+$//;               # trim trailing spaces if any
+        next unless length;
+        my ($_configParam, $_paramValue) = split(/\s*=\s*/, $_, 2);
+        $configParamHash{$_configParam} = $_paramValue;
+    }
+    close _FH;
+    return %configParamHash;
+}

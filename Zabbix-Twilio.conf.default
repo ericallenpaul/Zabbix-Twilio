@@ -1,0 +1,22 @@
+# Account information (This information is supplied by Twilio)
+accountSid = XXXXXXXXXXXXXXXXXXXX
+authToken = XXXXXXXXXXXXXXXXXXXXX
+
+# Set the logfile level
+# 4 = successes and failures
+# 5 = Failures Only
+LogFileLevel = 4
+
+# Enabled = 1, Disabled = 0
+# When enabled it looks at OncallNumbers
+# and rotates the weeks between them
+UseWeeklySchedule = 0
+
+# Multiple people designated to receive messages
+# on a weekly rotating call schedule
+OnCallNumbers = 5555021212,5555021213,5555021214
+OnCallNames = John,Jane,Joey
+
+# for a single number designated to receive messages
+OnCallNumber = 5555021212
+OnCallName = John
