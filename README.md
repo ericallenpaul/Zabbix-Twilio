@@ -78,5 +78,5 @@ If you want to notify the person on call, execute the script with "notify" as th
 3. If you get this error: "/usr/bin/perl^M: bad interpreter: No such file or directory" it means you have windows carriage returns instead of Unix carriage returns.
 You may need to run the following command in the same directory with the script:
 ```
-perl -i -pe 'y|\r||d' script.pl Zabbix-Twilio.pl
+perl -i -pe 'y|\r||d' Zabbix-Twilio.pl
 ```
