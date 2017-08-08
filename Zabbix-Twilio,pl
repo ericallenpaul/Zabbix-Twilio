@@ -157,10 +157,12 @@ sub RotateLogs {
         }
     }
 }
-sub CreateSchedule {
+
+sub CreateSchedule {
     ($OnCallNumbers, $OnCallNumber, $ShouldRewriteSchedule, $ShouldUseWeeklySchedule) = @_;
     my $directory = "Schedule";
-    if(! -e $directory)
+
+    if(! -e $directory)
     {
         unless(mkdir $directory) {
             die "Unable to create $directory\n";
@@ -177,7 +179,8 @@ sub RotateLogs {
         my $ArrSize = $#NumberArray;
 
         for( $i = 1; $i <= 52; $i = $i + 1 ){
-            open(FH,'>',"$directory/$i") or die "$!";
+
+            open(FH,'>',"$directory/$i") or die "$!";
             if($ShouldUseWeeklySchedule)
             {
                 print "Assigning week $i to @NumberArray[$Indexer]\n";
@@ -206,7 +209,8 @@ sub RotateLogs {
     }
 }
 
-
+
+
 sub GetPhoneNumber {
 
     my ($filename) = @_;

@@ -71,3 +71,12 @@ If you want to notify the person on call, execute the script with "notify" as th
 ```
 ./Zabbix-Twilio.pl Notify
 ```
+
+*Note:* Depending on your OS you may need to:
+1. Change the first line of the script from "#!/usr/bin/env perl" to "#!/usr/bin/perl". (The path with env is for windows).
+2. Download and compile the latest version of perl. The Twilio module is itself dependendent on other modules, most would be considered standard but it's poissible they may not be included with your distribution.
+3. If you get this error: "/usr/bin/perl^M: bad interpreter: No such file or directory" it means you have windows carriage returns instead of Unix carriage returns.
+You may need to run the following command in the same directory with the script:
+```
+perl -i -pe 'y|\r||d' script.pl Zabbix-Twilio.pl
+```
