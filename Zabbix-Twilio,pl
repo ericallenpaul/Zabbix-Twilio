@@ -60,7 +60,7 @@ if (((lc $message) eq "notify") && ($tomorrowWeekNumber > $weekNumber)) {
 	$ShouldNotify = 1;
     $NotificationNumber = GetPhoneNumber($tomorrowWeekNumber);
     SendMessage($configParamHash{accountSid}, $configParamHash{authToken}, $NotificationNumber, $NotificationMessage);
-    exit;
+    exit 0;
 }
 
 #assign the weekly schedule parameter
@@ -205,7 +205,7 @@ sub CreateSchedule {
             }
         }
         print "Done.\n";
-        exit;
+        exit 0;
     }
 }
 
