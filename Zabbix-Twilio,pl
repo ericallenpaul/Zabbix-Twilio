@@ -15,6 +15,11 @@ use Date::Calc qw(
     Add_Delta_Days
 );
 
+if(($#ARGV + 1) != 1)
+{
+	die "Error in arguments. This script only takes one argument.";
+}
+
 # Set the timezone
 my $date = DateTime->now->set_time_zone('America/New_York');
 
@@ -98,7 +103,7 @@ sub SendMessage{
     
     if ( exists $data->{SMSMessage}) 
     {
-         $logmessage = "Success: Status:$data->{SMSMessage}{Status}, DateCreated:$data->{SMSMessage}{DateCreated}, Sid:$data->{SMSMessage}{Sid}";
+         $logmessage = "Success: Status:$data->{SMSMessage}{Status}, DateCreated:$data->{SMSMessage}{DateCreated}, Sid:$data->{SMSMessage}{Sid}, Message:$message";
          $log->say(4, $logmessage);
     } 
     

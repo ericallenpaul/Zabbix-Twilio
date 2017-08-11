@@ -1,4 +1,9 @@
 # Zabbix-Twilio
+```
+DO NOT USE this with Zabbix. It won't work. I've left this here just in case anyone needs an example of using twilio in perl. There were problems with expected environment variables which (for security reasons) aren't present in the context of the Zabbix user.
+I have re-written this project as a shell script. If you wan't something that will work with Zabbix see my other [project](https://github.com/ericallenpaul/Zabbix-Twilio.sh)
+```
+
 A perl script for creating custom alerts in Zabbix that allows it to send text messages using the Twilio service. This script also supports a weekley on call schedule.
 _(You will need a [Twilo](https://www.twilio.com/) account in order to use this script.)_
 
